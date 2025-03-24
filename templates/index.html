@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What-If AI</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤔 What-If AI</h1>
+            <p>Explore alternative histories and possibilities with AI</p>
+        </div>
+
+        <div class="chat-container" id="chat-container">
+            {% for message in messages %}
+                <div class="message {% if message.role == 'user' %}user-message{% else %}ai-message{% endif %}">
+                    {{ message.content | safe if message.role == 'assistant' else message.content }}
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="input-container">
+            <form class="input-form" id="chat-form">
+                <textarea name="question" placeholder="Ask a historical what-if question..." required></textarea>
+                <button type="submit">Send</button>
+            </form>
+            <div class="loading" id="loading">
+                <span>Generating response...</span><div class="loader"></div>
+            </div>
+            <div class="error" id="error"></div>
+        </div>
+    </div>
+
+    <script src="/static/js/script.js"></script>
+</body>
+</html> 
