@@ -1,7 +1,12 @@
-import streamlit as st
+from fastapi import FastAPI, Request, Form
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+from typing import List, Dict
+import json
 
 # Load environment variables
 load_dotenv()
@@ -20,93 +25,60 @@ politely explain that you can only analyze historical scenarios and ask them to 
 Example valid questions: 'What if Rome never fell?', 'What if the Industrial Revolution started earlier?'
 Example invalid questions: 'What if I won the lottery?', 'What if aliens visit tomorrow?'"""
 
-# Set page config
-st.set_page_config(
-    page_title="What-If AI",
-    page_icon="🤔",
-    layout="wide"
-)
+app = FastAPI()
 
-# Initialize session state for chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# Mount static files
+app.mount("/static", StaticFiles(directory="templates/static"), name="static")
 
-# Custom CSS for better styling
-st.markdown("""
-    <style>
-    .stApp {
-        max-width: 800px;
-        margin: 0 auto;
-    }
-    .footer {
-        position: fixed;
-        bottom: 0;
-        width: 100%;
-        background-color: #f0f2f6;
-        padding: 10px;
-        text-align: center;
-        font-size: 0.8em;
-        color: #666;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# Templates
+templates = Jinja2Templates(directory="templates")
 
-# Header
-st.title(" What-If...?")
-st.markdown("""
-    Explore alternative histories and possibilities with AI. 
-    Enter your 'what-if' question below and let the AI generate a response.
-""")
+# Store messages in memory (in a real app, you'd use a database)
+messages: List[Dict] = []
 
-# Input section
-user_input = st.text_area(
-    "Enter your what-if question:",
-    placeholder="What if...",
-    height=100
-)
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "messages": messages}
+    )
 
-# Generate button
-if st.button("Generate Response", type="primary"):
-    if user_input:
-        with st.spinner("Generating response..."):
-            try:
-                completion = client.chat.completions.create(
-                    extra_headers={
-                        "HTTP-Referer": "https://github.com/alimammadlii/what-if",
-                        "X-Title": "What-If AI",
-                    },
-                    model="deepseek/deepseek-r1:free",
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": SYSTEM_PROMPT
-                        },
-                        {
-                            "role": "user",
-                            "content": user_input
-                        }
-                    ]
-                )
-                
-                # Add the new message to chat history
-                st.session_state.messages.append({
+@app.post("/chat")
+async def chat(question: str = Form(...)):
+    try:
+        completion = client.chat.completions.create(
+            extra_headers={
+                "HTTP-Referer": "https://github.com/alimammadlii/what-if",
+                "X-Title": "What-If AI",
+            },
+            model="deepseek/deepseek-r1:free",
+            messages=[
+                {
+                    "role": "system",
+                    "content": SYSTEM_PROMPT
+                },
+                {
                     "role": "user",
-                    "content": user_input
-                })
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": completion.choices[0].message.content
-                })
-                
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
-    else:
-        st.warning("Please enter a question first.")
+                    "content": question
+                }
+            ]
+        )
+        
+        # Add messages to history
+        messages.append({
+            "role": "user",
+            "content": question
+        })
+        messages.append({
+            "role": "assistant",
+            "content": completion.choices[0].message.content
+        })
+        
+        return {"status": "success", "messages": messages}
+    
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
-# Display chat history
-for message in st.session_state.messages:
-    if message["role"] == "user":
-        st.markdown(f"**You:** {message['content']}")
-    else:
-        st.markdown(f"**AI:** {message['content']}")
-        st.markdown("---")
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
